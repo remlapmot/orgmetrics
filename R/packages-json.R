@@ -213,27 +213,92 @@ clone_gh_org_repos <- function (pkgs_json = NULL, pkgs_dir = NULL) {
 
     out <- pbapply::pblapply (seq_len (nrow (pj)), function (i) {
         url <- paste0 ("https://github.com/", pj$orgrepo [i])
-        branch <- if ("branch" %in% names (pj) && !is.na (pj$branch [i])) pj$branch [i] else NULL
+        branch_field <- if ("branch" %in% names (pj) && !is.na (pj$branch [i])) pj$branch [i] else NULL
+        subdir <- if ("subdir" %in% names (pj) && !is.na (pj$subdir [i])) pj$subdir [i] else NULL
         dir_org <- fs::path_dir (pj$path [i])
         if (!fs::dir_exists (dir_org)) {
             fs::dir_create (dir_org)
         }
-        if (!fs::dir_exists (pj$path [i])) {
-            withr::with_dir (
-                dir_org,
-                gert::git_clone (url, branch = branch)
-            )
-        } else {
-            withr::with_dir (
-                pj$path [i], {
-                    gert::git_fetch (verbose = FALSE)
-                    if (!is.null (branch)) gert::git_branch_checkout (branch)
-                }
-            )
-        }
+        clone_or_update_repo (url, pj$path [i], dir_org, branch_field, pj$orgrepo [i], subdir)
     })
 
     invisible (unlist (out))
+}
+
+#' Clone a new repo or update an existing one, handling branch/SHA/*release
+#'
+#' @return Path to the R package root: `path/subdir` when `subdir` is set,
+#'   otherwise `path`.
+#' @noRd
+clone_or_update_repo <- function (url, path, dir_org, branch_field, orgrepo, subdir = NULL) {
+
+    btype <- branch_spec_type (branch_field)
+
+    if (btype == "release") {
+        branch_field <- get_latest_release_tag (orgrepo)
+        btype <- if (is.null (branch_field)) "none" else "tag"
+    }
+
+    clone_branch <- if (btype %in% c ("sha", "tag")) NULL else branch_field
+
+    if (!fs::dir_exists (path)) {
+        withr::with_dir (
+            dir_org,
+            gert::git_clone (url, branch = clone_branch)
+        )
+        if (btype %in% c ("sha", "tag")) {
+            withr::with_dir (path, checkout_ref (branch_field))
+        }
+    } else {
+        withr::with_dir (
+            path, {
+                gert::git_fetch (verbose = FALSE)
+                if (!is.null (branch_field)) {
+                    if (btype %in% c ("sha", "tag")) {
+                        checkout_ref (branch_field)
+                    } else {
+                        gert::git_branch_checkout (branch_field)
+                    }
+                }
+            }
+        )
+    }
+
+    if (!is.null (subdir)) fs::path (path, subdir) else path
+}
+
+#' Classify the value of a 'branch' field from packages.json
+#'
+#' @param branch Value of the `branch` field; may be `NULL`, `NA`, a branch
+#'   name, a full 40-character commit SHA, or the special string `"*release"`.
+#' @return One of `"none"`, `"release"`, `"sha"`, `"tag"`, or `"branch"`.
+#' @noRd
+branch_spec_type <- function (branch) {
+    if (is.null (branch) || is.na (branch)) return ("none")
+    if (identical (branch, "*release")) return ("release")
+    if (grepl ("^[0-9a-f]{40}$", branch, ignore.case = TRUE)) return ("sha")
+    if (grepl ("^v?[0-9]+\\.[0-9]", branch)) return ("tag")
+    return ("branch")
+}
+
+#' Fetch the tag name of the latest GitHub release for an org/repo
+#' @noRd
+get_latest_release_tag <- function (orgrepo) {
+    url <- paste0 ("https://api.github.com/repos/", orgrepo, "/releases/latest")
+    req <- httr2::request (url)
+    req <- add_gh_token_to_req (req)
+    resp <- httr2::req_error (req, is_error = \(resp) FALSE) |>
+        httr2::req_perform ()
+    if (httr2::resp_is_error (resp)) {
+        return (NULL)
+    }
+    httr2::resp_body_json (resp)$tag_name
+}
+
+#' Checkout a commit SHA or tag name (creates a detached HEAD)
+#' @noRd
+checkout_ref <- function (ref) {
+    system2 ("git", c ("checkout", ref), stdout = TRUE, stderr = TRUE)
 }
 
 update_pj_path <- function (pj, pkgs_dir) {
