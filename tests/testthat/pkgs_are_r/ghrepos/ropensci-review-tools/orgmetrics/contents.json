@@ -1,0 +1,6 @@
+[
+  {"name": "DESCRIPTION", "type": "file"},
+  {"name": "NAMESPACE", "type": "file"},
+  {"name": "R", "type": "dir"},
+  {"name": "man", "type": "dir"}
+]
