@@ -53,7 +53,7 @@ ctb_absence <- function (data_org,
 
         ctbs_gh <- repo$rm$contribs_from_gh_api |>
             dplyr::filter (login != "actions-user")
-        if (!all (c ("name", "login") %in% names (ctbs_gh))) {
+        if (!all (c ("name", "login") %in% names (ctbs_gh)) || nrow (ctbs_gh) == 0L) {
             return (res0)
         }
         ctbs_log <- repo$rm$contribs_from_log |>
