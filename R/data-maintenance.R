@@ -77,6 +77,9 @@ ctb_absence <- function (data_org,
             ctbs_gh$login [match (gh_map [, 1], ctbs_gh$name)]
         )
         # Reduce to logins only:
+        if (!is.matrix (gh_map) || ncol (gh_map) < 3L) {
+            return (res0)
+        }
         gh_logins <- apply (
             gh_map [, 2:3, drop = FALSE],
             1,
