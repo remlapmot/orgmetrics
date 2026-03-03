@@ -1,9 +1,5 @@
 org_repo_from_path <-
     utils::getFromNamespace ("org_repo_from_path", "repometrics")
-metrics_over_end_dates <-
-    utils::getFromNamespace ("metrics_over_end_dates", "repometrics")
-models_over_end_dates <-
-    utils::getFromNamespace ("models_over_end_dates", "repometrics")
 
 orgmetrics_collate_org_data <- function (pkgs_json, end_date = Sys.Date (), num_years = 3) {
 
@@ -35,22 +31,50 @@ orgmetrics_collate_org_data <- function (pkgs_json, end_date = Sys.Date (), num_
         if (fs::file_exists (f_tmp)) {
             dat_i <- readRDS (f_tmp)
         } else {
-            dat_repo <- repometrics::repometrics_data_repo (
-                pkgs_dat$path [i],
-                date_interval = "year"
-            )
-            dat_i <- list (
-                repo = dat_repo_to_end_date (dat_repo, end_date = end_date),
-                metrics = metrics_over_end_dates (
-                    pkgs_dat$path [i],
-                    end_date = end_date,
-                    num_years = num_years
+            result <- tryCatch (
+                callr::r (
+                    function (path, end_date, num_years) {
+                        metrics_over_end_dates <-
+                            utils::getFromNamespace ("metrics_over_end_dates", "repometrics")
+                        models_over_end_dates <-
+                            utils::getFromNamespace ("models_over_end_dates", "repometrics")
+                        list (
+                            repo = repometrics::repometrics_data_repo (
+                                path,
+                                date_interval = "year"
+                            ),
+                            metrics = metrics_over_end_dates (
+                                path,
+                                end_date = end_date,
+                                num_years = num_years
+                            ),
+                            models = models_over_end_dates (
+                                path,
+                                end_date = end_date,
+                                num_years = num_years
+                            )
+                        )
+                    },
+                    args = list (
+                        path = pkgs_dat$path [i],
+                        end_date = end_date,
+                        num_years = num_years
+                    )
                 ),
-                models = models_over_end_dates (
-                    pkgs_dat$path [i],
-                    end_date = end_date,
-                    num_years = num_years
-                )
+                error = function (e) {
+                    cli::cli_alert_warning (
+                        "Skipping {.val {pkgs_dat$orgrepo [i]}}: {conditionMessage (e)}"
+                    )
+                    NULL
+                }
+            )
+            if (is.null (result)) {
+                return (NULL)
+            }
+            dat_i <- list (
+                repo = dat_repo_to_end_date (result$repo, end_date = end_date),
+                metrics = result$metrics,
+                models = result$models
             )
             saveRDS (dat_i, f_tmp)
         }

@@ -12,6 +12,7 @@ URL: https://docs.ropensci.org/orgmetrics/,
 BugReports: https://github.com/ropensci-review-tools/orgmetrics/issues
 Depends: R (>= 4.1)
 Imports:
+    callr,
     checkmate,
     cli,
     dplyr,
