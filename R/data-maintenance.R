@@ -53,6 +53,9 @@ ctb_absence <- function (data_org,
 
         ctbs_gh <- repo$rm$contribs_from_gh_api |>
             dplyr::filter (login != "actions-user")
+        if (!all (c ("name", "login") %in% names (ctbs_gh))) {
+            return (res0)
+        }
         ctbs_log <- repo$rm$contribs_from_log |>
             dplyr::filter (!grepl ("github", handle, ignore.case = TRUE))
         log <- repo$rm$gitlog |>
