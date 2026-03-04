@@ -2,11 +2,15 @@
 
 # nocov start
 get_gh_token <- function () {
+    tok <- Sys.getenv ("GITHUB_TOKEN")
+    if (nzchar (tok)) {
+        return (tok)
+    }
     e <- Sys.getenv ()
     nms <- names (e)
-    tok <- unique (e [grep ("GITHUB", nms)])
+    tok <- unique (e [grep ("GITHUB\\_(PAT|TOK)", nms)])
     if (length (tok) != 1L) {
-        tok <- unique (e [grep ("GITHUB\\_(PAT|TOK)", nms)])
+        tok <- unique (e [grep ("GITHUB", nms)])
     }
     if (length (tok) != 1L) {
         cli::cli_abort (
