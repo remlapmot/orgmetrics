@@ -339,7 +339,7 @@ clone_r_univ_pkgs_json <- function (pkgs_json = NULL, pkgs_dir = fs::path_temp (
     checkmate::assert_directory_exists (pkgs_dir)
 
     pj <- jsonlite::read_json (pkgs_json, simplify = TRUE)
-    pj$orgrepo <- vapply (strsplit (pj$url, "\\/"), function (i) {
+    pj$orgrepo <- vapply (strsplit (gsub ("/$", "", pj$url), "\\/"), function (i) {
         paste0 (utils::tail (i, 2L), collapse = "/")
     }, character (1L))
     pj$is_r_pkg <- pkgs_are_r (pj$orgrepo)
