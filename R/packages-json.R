@@ -141,7 +141,7 @@ write_pkgs_json <- function (pkgs, dir = getwd ()) {
     return (outfile)
 }
 
-pkgs_are_r <- function (pkgs) {
+pkgs_are_r <- function (pkgs, subdirs = NULL) {
 
     # Supress no visible binding notes:
     type <- NULL
@@ -152,7 +152,15 @@ pkgs_are_r <- function (pkgs) {
         return (logical (0L))
     }
 
-    urls <- paste0 (u_base, pkgs, "/contents")
+    if (is.null (subdirs) || all (is.na (subdirs))) {
+        urls <- paste0 (u_base, pkgs, "/contents")
+    } else {
+        urls <- ifelse (
+            is.na (subdirs) | !nzchar (subdirs),
+            paste0 (u_base, pkgs, "/contents"),
+            paste0 (u_base, pkgs, "/contents/", subdirs)
+        )
+    }
 
     is_r_pkg <- vapply (urls, function (u) {
 
@@ -342,7 +350,8 @@ clone_r_univ_pkgs_json <- function (pkgs_json = NULL, pkgs_dir = fs::path_temp (
     pj$orgrepo <- vapply (strsplit (gsub ("/$", "", pj$url), "\\/"), function (i) {
         paste0 (utils::tail (i, 2L), collapse = "/")
     }, character (1L))
-    pj$is_r_pkg <- pkgs_are_r (pj$orgrepo)
+    subdirs <- if ("subdir" %in% names (pj)) pj$subdir else NULL
+    pj$is_r_pkg <- pkgs_are_r (pj$orgrepo, subdirs = subdirs)
 
     dir_parts <- fs::path_split (pkgs_dir) [[1]]
     pj$path <- vapply (strsplit (pj$orgrepo, "\\/"), function (i) {
