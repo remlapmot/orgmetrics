@@ -18,11 +18,9 @@ get_gh_token <- function () {
 
 add_gh_token_to_req <- function (req) {
 
-    if (!nzchar (Sys.getenv ("GITHUB_WORKFLOW"))) {
-        tok <- get_gh_token ()
-        req <- req |>
-            httr2::req_headers ("Authorization" = paste0 ("Bearer ", tok))
-    }
+    tok <- get_gh_token ()
+    req <- req |>
+        httr2::req_headers ("Authorization" = paste0 ("Bearer ", tok))
 
     return (req)
 }
