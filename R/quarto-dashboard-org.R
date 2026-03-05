@@ -423,7 +423,10 @@ dashboard_data_maintainers <- function (data_contributors) {
         f = as.factor (ctb_df$login)
     ), function (m) {
         lapply (seq_len (nrow (m)), function (i) {
-            list (package = m$package [i], contributions = m$contributions [i])
+            list (
+                package = jsonlite::unbox (m$package [i]),
+                contributions = jsonlite::unbox (m$contributions [i])
+            )
         })
     })
 
