@@ -221,8 +221,16 @@ clone_gh_org_repos <- function (pkgs_json = NULL, pkgs_dir = NULL) {
     # Supress no visible binding notes:
     is_r_pkg <- NULL
 
-    pj <- jsonlite::read_json (pkgs_json, simplify = TRUE) |>
-        dplyr::filter (is_r_pkg) |>
+    pj_all <- jsonlite::read_json (pkgs_json, simplify = TRUE)
+    pj_not_r <- dplyr::filter (pj_all, !is_r_pkg)
+    if (nrow (pj_not_r) > 0L) {
+        nms <- if ("orgrepo" %in% names (pj_not_r)) pj_not_r$orgrepo else pj_not_r$package
+        cli::cli_alert_warning (
+            "Skipping {nrow (pj_not_r)} package(s) that failed R package checks \\
+(missing DESCRIPTION, NAMESPACE, R/, or man/): {paste0 (nms, collapse = ', ')}"
+        )
+    }
+    pj <- dplyr::filter (pj_all, is_r_pkg) |>
         update_pj_path (fs::path_dir (pkgs_json))
 
     cli::cli_alert_info ("Cloning or updating {nrow (pj)} repositories.")
