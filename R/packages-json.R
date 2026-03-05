@@ -344,7 +344,10 @@ update_pj_path <- function (pj, pkgs_dir) {
                 do.call (fs::path, as.list (p [seq_len (length (p) - 2)]))
             )
         }, character (1L))
-        index <- which (!fs::dir_exists (path_dir))
+        # Only prepend pkgs_dir to relative paths; absolute paths (written by
+        # clone_r_univ_pkgs_json) must not be mangled even when their
+        # grandparent directory does not exist yet (e.g. before the clone loop).
+        index <- which (!fs::is_absolute_path (pj$path))
         pj$path [index] <- fs::path (pkgs_dir, pj$path [index])
     } else {
         pj$path <- fs::path (pkgs_dir, pj$package)
