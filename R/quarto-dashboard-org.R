@@ -234,6 +234,10 @@ dashboard_data_contributors <- function (data_org, desc_name_match = 0.8) {
         ctbs <- repo$rm$contribs_from_gh_api |>
             dplyr::select (login, name, contributions) |>
             dplyr::filter (!grepl ("github\\-actions|\\[bot\\]", login))
+        if (nrow (ctbs) == 0L || length (auts) == 0L) {
+            ctbs$is_author <- logical (nrow (ctbs))
+            return (ctbs)
+        }
         aut_matches <- do.call (rbind, lapply (
             auts,
             function (a) {
