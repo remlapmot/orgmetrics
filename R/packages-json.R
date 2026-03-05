@@ -164,7 +164,7 @@ pkgs_are_r <- function (pkgs, subdirs = NULL, branches = NULL) {
 
     if (!is.null (branches) && !all (is.na (branches))) {
         urls <- ifelse (
-            is.na (branches) | !nzchar (branches),
+            is.na (branches) | !nzchar (branches) | branches == "*release",
             urls,
             paste0 (urls, "?ref=", branches)
         )
