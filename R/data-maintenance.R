@@ -47,7 +47,7 @@ ctb_absence <- function (data_org,
 
     abs <- lapply (data_org$repos, function (repo) {
 
-        if (!all (names (repo) %in% obj_nms)) {
+        if (is.null (repo) || !all (obj_nms %in% names (repo))) {
             return (res0)
         }
 
