@@ -266,7 +266,7 @@ dashboard_data_contributors <- function (data_org, desc_name_match = 0.8) {
         }
 
         ctbs$is_author <- ctbs$name %in% aut_matches$name |
-            ctbs$login %in% login_matches
+            ctbs$login %in% login_matches$name
 
         return (ctbs)
     })
