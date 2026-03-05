@@ -231,11 +231,20 @@ clone_gh_org_repos <- function (pkgs_json = NULL, pkgs_dir = NULL) {
         url <- paste0 ("https://github.com/", pj$orgrepo [i])
         branch_field <- if ("branch" %in% names (pj) && !is.na (pj$branch [i])) pj$branch [i] else NULL
         subdir <- if ("subdir" %in% names (pj) && !is.na (pj$subdir [i])) pj$subdir [i] else NULL
-        dir_org <- fs::path_dir (pj$path [i])
+        # When subdir is set, pj$path includes the subdir suffix; strip it to
+        # get the repo root so git_clone creates the right directory.
+        repo_path_i <- if (!is.null (subdir) && nzchar (subdir)) {
+            n <- length (fs::path_split (subdir) [[1]])
+            parts <- fs::path_split (pj$path [i]) [[1]]
+            do.call (fs::path, as.list (utils::head (parts, -n)))
+        } else {
+            pj$path [i]
+        }
+        dir_org <- fs::path_dir (repo_path_i)
         if (!fs::dir_exists (dir_org)) {
             fs::dir_create (dir_org)
         }
-        clone_or_update_repo (url, pj$path [i], dir_org, branch_field, pj$orgrepo [i], subdir)
+        clone_or_update_repo (url, repo_path_i, dir_org, branch_field, pj$orgrepo [i], subdir)
     })
 
     invisible (unlist (out))
