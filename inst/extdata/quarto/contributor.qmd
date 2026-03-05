@@ -83,8 +83,10 @@ repo_src = {
 }
 json_data = FileAttachment("results-json-data.json").json();
 maintainer_pkgs = json_data['maintainer_pkgs'];
+contributor_pkgs = json_data['contributor_pkgs'];
 comaintainers = json_data['comaintainers'];
 maintainers = Object.keys(maintainer_pkgs);
+all_logins = [...new Set([...Object.keys(maintainer_pkgs), ...Object.keys(contributor_pkgs)])].sort();
 ```
 
 <!---- break --->
@@ -110,11 +112,11 @@ setInitialMaintainer = function(searchParams, maintainers) {
 maintainerSet = setInitialMaintainer(searchParams, maintainers);
 
 viewof maintainer = Inputs.select(
-    maintainers,
+    all_logins,
     {
         multiple: false,
         value: maintainerSet,
-        label: htl.html`<b>Maintainer:</b>`
+        label: htl.html`<b>Contributor:</b>`
     }
 )
 s = localStorage.setItem("orgmetricsMaintainer", maintainer.toString());
@@ -137,7 +139,9 @@ tempvar = window.history.replaceState(null, '', url_new);
 <!---- break --->
 
 ```{ojs extract-maintainer-data}
-these_pkgs = maintainer_pkgs[maintainer] || null;
+these_pkgs = maintainer_pkgs[maintainer] || [];
+these_ctb_pkgs = contributor_pkgs[maintainer] || [];
+these_ctb_pkg_names = these_ctb_pkgs.map(d => d.package);
 
 these_cos = comaintainers[maintainer] || null
 these_cos_list = these_cos ?
@@ -149,15 +153,15 @@ these_cos.map(i => htl.html`
 
 <div style="margin-top: 10px; margin-bottom: 10px;"></div>
 
-## Repositories
+## Maintained Repositories
 
 This is a sub-set of the main table on [the _Organization_ page](/org.html),
 showing repository metrics aggregated across the four categories described there.
-Values are shown only for any repositories to which
-`{ojs} maintainer_gh_url` has
-contributed, and are scaled between 0 and 1 based on the distribution of values
-across the entire organization, with higher values always better than lower
-values.
+Values are shown only for repositories where
+`{ojs} maintainer_gh_url` is listed as a maintainer or author in the package
+DESCRIPTION file, and are scaled between 0 and 1 based on the distribution of
+values across the entire organization, with higher values always better than
+lower values.
 
 <!---
 ******** START REPO-LEVEL METRICS TABLE ********
@@ -186,7 +190,9 @@ metricsGroupedTable = {
         ...row,
     }));
 }
-metricsTable = metricsGroupedTable.filter(i => these_pkgs.includes(i.package));
+metricsTable = these_pkgs.length > 0
+    ? metricsGroupedTable.filter(i => these_pkgs.includes(i.package))
+    : [];
 ```
 
 ```{ojs}
@@ -219,6 +225,70 @@ Inputs.table(metricsTable, {
 
 <!---
 ******** END REPO-LEVEL METRICS TABLE ********
+--->
+
+## Contributor Repositories
+
+Packages to which `{ojs} maintainer_gh_url` has committed but is not listed as
+a maintainer or author in the package DESCRIPTION file. Commit counts are for
+this contributor only; metrics describe the package as a whole.
+
+<!---
+******** START CONTRIBUTOR REPOS TABLE ********
+--->
+
+```{ojs ctb-repos-commits}
+ctbCommitsMax = d3.max(these_ctb_pkgs, d => d.contributions) || 1;
+these_ctb_pkgs.length > 0
+    ? Inputs.table(these_ctb_pkgs, {
+        columns: ["package", "contributions"],
+        header: {
+            package: "Package",
+            contributions: tooltip("Commits", "Number of commits by this contributor to the package")
+        },
+        format: {
+            package: d => pkgfmt(d),
+            contributions: sparkbar(ctbCommitsMax)
+        }
+    })
+    : htl.html`<p><i>No contributor-only repositories found.</i></p>`
+```
+
+```{ojs ctb-repos-metrics}
+ctbMetricsTable = these_ctb_pkg_names.length > 0
+    ? metricsGroupedTable.filter(i => these_ctb_pkg_names.includes(i.package))
+    : [];
+ctbMetricsTable.length > 0
+    ? Inputs.table(ctbMetricsTable, {
+        width: {
+            package: 100,
+            total: 200,
+            development: 200,
+            issues: 200,
+            popularity: 200,
+            meta: 200,
+        },
+        format: {
+            package: d => pkgfmt(d),
+            development: sparkbar(d3.max(metricsGroupedTable, d => d.development)),
+            issues: sparkbar(d3.max(metricsGroupedTable, d => d.issues)),
+            popularity: sparkbar(d3.max(metricsGroupedTable, d => d.popularity)),
+            meta: sparkbar(d3.max(metricsGroupedTable, d => d.meta)),
+            total: sparkbar(d3.max(metricsGroupedTable, d => d.total)),
+        },
+        header: {
+            development: tooltip("Development", "Code development and maintenance metrics"),
+            issues: tooltip("Issues", "GitHub issues and pull request activity"),
+            popularity: tooltip("Popularity", "Project popularity on CRAN (where applicable) and GitHub"),
+            meta: tooltip("Dependencies and releases", ""),
+            total: tooltip("Overall", "Average across all four categories of metrics."),
+        },
+    })
+    : htl.html``
+```
+
+<!---
+******** END CONTRIBUTOR REPOS TABLE ********
 --->
 
 ## Network
@@ -285,6 +355,9 @@ pkgs_expanded = [...new Set(pkgs_expanded_full)];
 
 co_nodes = these_cos ?
     these_cos.map(item => ({ id: item, group: "Co-maintainer", size: 6 })) : [];
+ctb_pkg_nodes = these_ctb_pkg_names
+    .filter(item => !pkgs_expanded.includes(item))
+    .map(item => ({ id: item, group: "Contributed packages", size: 5 }));
 nodes = [
     { id: maintainer, group: "Maintainer", size: 10 },
     ...pkgs_expanded.map(item => ({
@@ -292,7 +365,8 @@ nodes = [
         group: these_pkgs.includes(item) ? "packages" : "otherPackages",
         size: these_pkgs.includes(item) ? 8 : 4,
     })),
-    ...co_nodes
+    ...co_nodes,
+    ...ctb_pkg_nodes
 ];
 
 // edges are mappings from co-maintainers to all packages. First collect list
@@ -315,7 +389,10 @@ links = [
     })),
     ...these_co_pkgs_flat.map(item => ({
         source: item.source, target: item.target, value: 2
-    }))
+    })),
+    ...these_ctb_pkg_names
+        .filter(item => !pkgs_expanded.includes(item))
+        .map(item => ({ source: maintainer, target: item, value: 1 }))
 ];
 ```
 
@@ -435,7 +512,7 @@ chart = {
         .html(d => d.group === "Co-maintainer" ?
             `<a href="../contributor.html"
                 onclick="localStorage.setItem('orgmetricsMaintainer', '${d.id}')">${d.id}</a>` :
-            ((d.group === "packages" || d.group === "otherPackages") ?
+            ((d.group === "packages" || d.group === "otherPackages" || d.group === "Contributed packages") ?
                 `<a href="../repo.html"
                     onclick="localStorage.setItem('orgmetricsRepo', '${d.id}')">${d.id}</a>` :
             d.id))

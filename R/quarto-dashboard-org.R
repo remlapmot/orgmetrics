@@ -114,6 +114,7 @@ orgmetrics_dashboard <- function (data_org,
         r_universe = data_r_universe,
         rm_metrics_models = rm_metrics_models,
         maintainer_pkgs = maintainers$maintainers,
+        contributor_pkgs = maintainers$contributors,
         comaintainers = maintainers$comaintainers
     )
 
@@ -395,24 +396,38 @@ dashboard_data_r_universe <- function (data_org) {
 dashboard_data_maintainers <- function (data_contributors) {
 
     # Suppress no visible binding notes:
-    gh_handle <- package <- login <- X1 <- NULL
+    gh_handle <- package <- login <- X1 <- is_author <- contributions <- NULL
 
     data_maintainers <- do.call (rbind, data_contributors)
     pkgs <- gsub ("\\.[0-9]+$", "", rownames (data_maintainers))
     rownames (data_maintainers) <- NULL
     data_maintainers$package <- pkgs
 
-    maintainer_pkgs <- data_maintainers |>
+    base_df <- dplyr::filter (data_maintainers, !is.na (login))
+
+    # Maintainer packages: DESCRIPTION authors only
+    maint_df <- dplyr::filter (base_df, is_author) |>
         dplyr::arrange (login, package) |>
-        dplyr::filter (!is.na (login)) |>
         dplyr::select (login, package)
     maintainer_pkgs_json <- lapply (split (
-        maintainer_pkgs,
-        f = as.factor (maintainer_pkgs$login)
+        maint_df,
+        f = as.factor (maint_df$login)
     ), function (m) unique (m$package))
 
-    comaintainers <- maintainer_pkgs |>
-        dplyr::filter (!is.na (login)) |>
+    # Contributor packages: has commits but not a DESCRIPTION author
+    ctb_df <- dplyr::filter (base_df, !is_author) |>
+        dplyr::arrange (login, dplyr::desc (contributions)) |>
+        dplyr::select (login, package, contributions)
+    contributor_pkgs_json <- lapply (split (
+        ctb_df,
+        f = as.factor (ctb_df$login)
+    ), function (m) {
+        lapply (seq_len (nrow (m)), function (i) {
+            list (package = m$package [i], contributions = m$contributions [i])
+        })
+    })
+
+    comaintainers <- maint_df |>
         dplyr::arrange (package) |>
         dplyr::select (login, package) |>
         dplyr::distinct ()
@@ -439,6 +454,7 @@ dashboard_data_maintainers <- function (data_contributors) {
 
     list (
         maintainers = maintainer_pkgs_json,
+        contributors = contributor_pkgs_json,
         comaintainers = comaintainers_json
     )
 }
