@@ -63,8 +63,8 @@ clone_univ <- function (url, dest_dir) {
     checkmate::assert_directory_exists (dest_dir)
     if (!is.null (url)) {
         td <- fs::path (fs::path_temp (), "orgmetrics")
-        if (!fs::dir_exists (td)) {
-            fs::dir_create (td, recurse = TRUE)
+        if (fs::dir_exists (td)) {
+            fs::dir_delete (td)
         }
         gert::git_clone (url, path = td)
     } else {
