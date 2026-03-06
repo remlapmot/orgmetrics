@@ -155,6 +155,22 @@ rm_old_data_from_cloned_univ <- function (dest_dir) {
 
     fn_dat <- deploy_fn_data ()
     f <- fs::path (dest_dir, paste0 (fn_dat [, 2], ".Rds"))
+
+    # Invalidate cache if orgmetrics version has changed since last run.
+    ver_file <- fs::path (dest_dir, "orgmetrics_version.txt")
+    current_ver <- as.character (utils::packageVersion ("orgmetrics"))
+    if (fs::file_exists (ver_file)) {
+        cached_ver <- readLines (ver_file, warn = FALSE)
+        if (!identical (cached_ver, current_ver)) {
+            cli::cli_inform (
+                "orgmetrics version changed ({cached_ver} -> {current_ver}); \\
+invalidating cached data."
+            )
+            fs::file_delete (f [fs::file_exists (f)])
+        }
+    }
+    writeLines (current_ver, ver_file)
+
     info <- fs::file_info (f)
     td <- difftime (Sys.time (), info$modification_time, units = "days")
     files_to_rm <- info$path [which (td > 1)]
