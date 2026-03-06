@@ -236,6 +236,7 @@ dashboard_data_contributors <- function (data_org, desc_name_match = 0.8) {
             dplyr::filter (!grepl ("github\\-actions|\\[bot\\]", login))
         if (nrow (ctbs) == 0L || length (auts) == 0L) {
             ctbs$is_author <- logical (nrow (ctbs))
+            attr (ctbs, "desc_authors") <- auts
             return (ctbs)
         }
         aut_matches <- do.call (rbind, lapply (
@@ -272,6 +273,7 @@ dashboard_data_contributors <- function (data_org, desc_name_match = 0.8) {
         ctbs$is_author <- ctbs$name %in% aut_matches$name |
             ctbs$login %in% login_matches$name
 
+        attr (ctbs, "desc_authors") <- auts
         return (ctbs)
     })
     names (data_contributors) <- gsub ("^.*\\/", "", names (data_contributors))
@@ -409,10 +411,46 @@ dashboard_data_maintainers <- function (data_contributors) {
 
     base_df <- dplyr::filter (data_maintainers, !is.na (login))
 
+    # Global name -> login map: use all ctb rows that have both fields
+    name_login_map <- unique (base_df [!is.na (base_df$name) & nzchar (base_df$name),
+                                       c ("name", "login")])
+
+    # Second pass: find DESCRIPTION authors with no commit entry in this repo.
+    # Try to resolve their login via the global name->login map and add them.
+    extra_maint <- do.call (rbind, lapply (names (data_contributors), function (pkg) {
+        d <- data_contributors [[pkg]]
+        desc_auts <- attr (d, "desc_authors")
+        if (is.null (desc_auts) || length (desc_auts) == 0L) return (NULL)
+        known_logins <- d$login [!is.na (d$login) & d$is_author]
+        known_names  <- d$name  [!is.na (d$login) & d$is_author]
+        # For each DESCRIPTION author, check whether they are already covered
+        do.call (rbind, lapply (desc_auts, function (a) {
+            if (length (known_names) > 0L) {
+                nm <- match_names (a, known_names)
+                if (is.numeric (nm$match) && max (nm$match, na.rm = TRUE) >= 0.8) return (NULL)
+            }
+            if (length (known_logins) > 0L) {
+                lm <- match_names (a, known_logins)
+                if (is.numeric (lm$match) && max (lm$match, na.rm = TRUE) >= 0.8) return (NULL)
+            }
+            # Not covered – look up in global map
+            if (nrow (name_login_map) == 0L) return (NULL)
+            scores <- match_names (a, name_login_map$name)
+            if (!is.numeric (scores$match) || max (scores$match, na.rm = TRUE) < 0.8) return (NULL)
+            best <- which (scores$match == max (scores$match, na.rm = TRUE)) [1]
+            data.frame (login = name_login_map$login [best], package = pkg,
+                        stringsAsFactors = FALSE)
+        }))
+    }))
+
     # Maintainer packages: DESCRIPTION authors only
     maint_df <- dplyr::filter (base_df, is_author) |>
         dplyr::arrange (login, package) |>
         dplyr::select (login, package)
+    if (!is.null (extra_maint) && nrow (extra_maint) > 0L) {
+        maint_df <- dplyr::distinct (dplyr::bind_rows (maint_df, extra_maint)) |>
+            dplyr::arrange (login, package)
+    }
     maintainer_pkgs_json <- lapply (split (
         maint_df,
         f = as.factor (maint_df$login)
