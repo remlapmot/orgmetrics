@@ -233,9 +233,15 @@ clone_gh_org_repos <- function (pkgs_json = NULL, pkgs_dir = NULL) {
     pj <- dplyr::filter (pj_all, is_r_pkg) |>
         update_pj_path (fs::path_dir (pkgs_json))
 
-    cli::cli_alert_info ("Cloning or updating {nrow (pj)} repositories.")
+    n_cores <- min (nrow (pj), max (1L, parallel::detectCores () - 1L))
+    use_parallel <- .Platform$OS.type == "unix" &&
+        n_cores > 1L &&
+        requireNamespace ("parallel", quietly = TRUE)
+    cli::cli_alert_info (
+        "Cloning or updating {nrow (pj)} repositories{if (use_parallel) paste0 (' (', n_cores, ' cores)') else ''}."
+    )
 
-    out <- pbapply::pblapply (seq_len (nrow (pj)), function (i) {
+    worker <- function (i) {
         url <- paste0 ("https://github.com/", pj$orgrepo [i])
         branch_field <- if ("branch" %in% names (pj) && !is.na (pj$branch [i])) pj$branch [i] else NULL
         subdir <- if ("subdir" %in% names (pj) && !is.na (pj$subdir [i])) pj$subdir [i] else NULL
@@ -253,7 +259,13 @@ clone_gh_org_repos <- function (pkgs_json = NULL, pkgs_dir = NULL) {
             fs::dir_create (dir_org)
         }
         clone_or_update_repo (url, repo_path_i, dir_org, branch_field, pj$orgrepo [i], subdir)
-    })
+    }
+
+    out <- if (use_parallel) {
+        parallel::mclapply (seq_len (nrow (pj)), worker, mc.cores = n_cores)
+    } else {
+        pbapply::pblapply (seq_len (nrow (pj)), worker)
+    }
 
     invisible (unlist (out))
 }
