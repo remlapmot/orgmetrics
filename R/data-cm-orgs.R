@@ -138,7 +138,13 @@ rm_tmp_pkg_files <- function (pkgs) {
 dat_repo_authors <- function (dat_repo) {
 
     auts <- NULL
-    desc_path <- fs::path (dat_repo$pkgcheck$pkg$path, "DESCRIPTION")
+    # Use repo_path (set after cache load) rather than path (may be stale from
+    # pkgcheck file cache if the package was cloned to a different temp dir).
+    pkg_path <- dat_repo$pkgcheck$pkg$repo_path
+    if (is.null (pkg_path)) {
+        pkg_path <- dat_repo$pkgcheck$pkg$path
+    }
+    desc_path <- fs::path (pkg_path, "DESCRIPTION")
 
     if (fs::file_exists (desc_path)) {
         auts <- tryCatch (
