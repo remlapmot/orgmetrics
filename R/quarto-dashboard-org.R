@@ -436,7 +436,7 @@ dashboard_data_maintainers <- function (data_contributors) {
             # Not covered – look up in global map
             if (nrow (name_login_map) == 0L) return (NULL)
             scores <- match_names (a, name_login_map$name)
-            if (!is.numeric (scores$match) || max (scores$match, na.rm = TRUE) < 0.8) return (NULL)
+            if (!is.numeric (scores$match) || max (scores$match, na.rm = TRUE) < 0.95) return (NULL)
             best <- which (scores$match == max (scores$match, na.rm = TRUE)) [1]
             data.frame (login = name_login_map$login [best], package = pkg,
                         stringsAsFactors = FALSE)
