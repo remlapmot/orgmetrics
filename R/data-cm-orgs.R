@@ -19,8 +19,15 @@ orgmetrics_collate_org_data <- function (pkgs_json, end_date = Sys.Date (), num_
     pkgs_dat$path [index] <- fs::path (fs::path_dir (pkgs_json), pkgs_dat$path [index])
     is_test_env <- Sys.getenv ("ORGMETRICS_TESTS") == "true"
 
-    # pkgs_dat has [path, orgrepo, root, is_r_pkg]
-    data <- lapply (seq_len (nrow (pkgs_dat)), function (i) {
+    n_cores <- min (nrow (pkgs_dat), max (1L, parallel::detectCores () - 1L))
+    use_parallel <- .Platform$OS.type == "unix" &&
+        n_cores > 1L &&
+        requireNamespace ("parallel", quietly = TRUE)
+    cli::cli_alert_info (
+        "Extracting data on {nrow (pkgs_dat)} repositories{if (use_parallel) paste0 (' (', n_cores, ' cores)') else ''}."
+    )
+
+    worker <- function (i) {
 
         if (!pkgs_dat$is_r_pkg [i] && !is_test_env) {
             return (NULL)
@@ -83,7 +90,14 @@ orgmetrics_collate_org_data <- function (pkgs_json, end_date = Sys.Date (), num_
             saveRDS (dat_i, f_tmp)
         }
         return (dat_i)
-    })
+    }
+
+    # pkgs_dat has [path, orgrepo, root, is_r_pkg]
+    data <- if (use_parallel) {
+        parallel::mclapply (seq_len (nrow (pkgs_dat)), worker, mc.cores = n_cores)
+    } else {
+        lapply (seq_len (nrow (pkgs_dat)), worker)
+    }
 
     index <- which (vapply (data, length, integer (1L)) > 0L)
     pkgs_dat <- pkgs_dat [index, ]
