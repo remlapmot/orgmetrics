@@ -179,6 +179,15 @@ issue_responses <- function (data_org,
         issues <- repo$rm$issues_from_gh_api
         prop_labelled <- length (which (nzchar (issues$labels))) / nrow (issues)
         ctbs_gh <- repo$rm$contribs_from_gh_api
+        if (is.null (ctbs_gh)) {
+            return (data.frame (
+                repo = character (0L),
+                issue_number = integer (0L),
+                created_at = numeric (0L),
+                responded_at = numeric (0L),
+                response_duration = numeric (0L)
+            ))
+        }
         n_ctbs <- cumsum (ctbs_gh$contributions / sum (ctbs_gh$contributions))
         ctbs_main <- ctbs_gh$login [which (n_ctbs <= 0.9)]
 
