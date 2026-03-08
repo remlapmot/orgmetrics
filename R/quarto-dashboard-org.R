@@ -231,13 +231,15 @@ dashboard_data_contributors <- function (data_org, desc_name_match = 0.8) {
     data_contributors <- lapply (data_org$repos, function (repo) {
 
         auts <- gsub ("(\\s?)(\\[|<).*$", "", repo$authors)
-        if (is.null (repo$rm$contribs_from_gh_api)) {
+        ctbs_raw <- repo$rm$contribs_from_gh_api
+        if (!is.data.frame (ctbs_raw) || nrow (ctbs_raw) == 0L ||
+                !all (c ("login", "name", "contributions") %in% names (ctbs_raw))) {
             res <- data.frame (login = character (0L), name = character (0L),
                                contributions = integer (0L), is_author = logical (0L))
             attr (res, "desc_authors") <- auts
             return (res)
         }
-        ctbs <- repo$rm$contribs_from_gh_api |>
+        ctbs <- ctbs_raw |>
             dplyr::select (login, name, contributions) |>
             dplyr::filter (!grepl ("github\\-actions|\\[bot\\]", login))
         if (nrow (ctbs) == 0L || length (auts) == 0L) {

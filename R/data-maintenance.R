@@ -179,7 +179,8 @@ issue_responses <- function (data_org,
         issues <- repo$rm$issues_from_gh_api
         prop_labelled <- length (which (nzchar (issues$labels))) / nrow (issues)
         ctbs_gh <- repo$rm$contribs_from_gh_api
-        if (is.null (ctbs_gh)) {
+        if (!is.data.frame (ctbs_gh) || nrow (ctbs_gh) == 0L ||
+                !all (c ("login", "contributions") %in% names (ctbs_gh))) {
             return (data.frame (
                 repo = character (0L),
                 issue_number = integer (0L),
