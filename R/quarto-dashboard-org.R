@@ -250,36 +250,17 @@ dashboard_data_contributors <- function (data_org, desc_name_match = 0.8) {
         aut_matches <- do.call (rbind, lapply (
             auts,
             function (a) {
-                rbind (
-                    cbind (match_names (a, ctbs$name) [1, ], what = "name"),
-                    cbind (match_names (a, ctbs$login) [1, ], what = "login")
-                )
+                match_names (a, ctbs$name) [1, ]
             }
         )) |> data.frame ()
-        login_matches <- dplyr::filter (aut_matches, what == "login")
 
         # If there are no aut_matches, df only has "what"
         if (nrow (aut_matches) > 0L && is.numeric (aut_matches$match)) {
             aut_matches <- aut_matches |>
-                dplyr::filter (what == "name") |>
-                dplyr::filter (match >= desc_name_match)
-        }
-        if (nrow (aut_matches) == 0) {
-            max_match <- 0
-            if (nrow (login_matches) > 0) {
-                max_match <- max (login_matches$match, na.rm = TRUE)
-            }
-            desc_name_match <- desc_name_match * max_match
-        }
-
-        if (is.numeric (login_matches$match)) {
-            # FALSE is no aut_matches at all
-            login_matches <- login_matches |>
                 dplyr::filter (match >= desc_name_match)
         }
 
-        ctbs$is_author <- ctbs$name %in% aut_matches$name |
-            ctbs$login %in% login_matches$name
+        ctbs$is_author <- ctbs$name %in% aut_matches$name
 
         attr (ctbs, "desc_authors") <- auts
         return (ctbs)
