@@ -200,6 +200,10 @@ data_metrics_group <- function (metrics_all) {
 #' @noRd
 data_models_preprocess <- function (data_models) {
 
+    if (is.null (data_models)) {
+        return (NULL)
+    }
+
     # Suppress no visible binding notes:
     package <- final <- NULL
 
