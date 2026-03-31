@@ -12,6 +12,10 @@
 #' @noRd
 data_metrics_to_df <- function (data_metrics) {
 
+    if (length (data_metrics) == 0L) {
+        return (NULL)
+    }
+
     # Suppress no visible binding notes:
     pr_reviews_approved <- pr_revs_approved <- NULL
 
