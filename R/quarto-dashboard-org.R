@@ -45,24 +45,34 @@ orgmetrics_dashboard <- function (data_org,
 
     # -------- CHAOSS MODELS and METRICS: START -------
     cli::cli_inform ("   -> data_models_preprocess")
-    data_models <- data_models_preprocess (data_org$models) |>
-        dplyr::select (-org, -date) |>
-        tidyr::pivot_longer (-package)
+    data_models_raw <- data_models_preprocess (data_org$models)
+    data_models <- if (!is.null (data_models_raw)) {
+        data_models_raw |>
+            dplyr::select (-org, -date) |>
+            tidyr::pivot_longer (-package)
+    } else {
+        NULL
+    }
 
     cli::cli_inform ("   -> data_metrics_to_df")
     data_metrics <- data_metrics_to_df (data_org$metrics)
 
     dates <- sort (unique (data_metrics$date), decreasing = TRUE)
     cli::cli_inform ("   -> dashboard_data_repo_metrics")
-    repo_metrics <- dashboard_data_repo_metrics (data_metrics, dates)
+    if (!is.null (data_metrics) && length (dates) > 0L) {
+        repo_metrics <- dashboard_data_repo_metrics (data_metrics, dates)
 
-    cli::cli_inform ("   -> data_metrics_preprocess")
-    data_metrics <- lapply (dates, function (d) {
-        data_metrics |>
-            dplyr::filter (date == d) |>
-            data_metrics_preprocess ()
-    })
-    names (data_metrics) <- dates
+        cli::cli_inform ("   -> data_metrics_preprocess")
+        data_metrics <- lapply (dates, function (d) {
+            data_metrics |>
+                dplyr::filter (date == d) |>
+                data_metrics_preprocess ()
+        })
+        names (data_metrics) <- dates
+    } else {
+        repo_metrics <- list ()
+        data_metrics <- list ()
+    }
     # -------- CHAOSS MODELS and METRICS: END -------
 
     # -------- ADDITIONAL DATA IN R -------
